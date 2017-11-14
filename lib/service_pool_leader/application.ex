@@ -5,6 +5,8 @@ defmodule ServicePoolLeader.Application do
 
   use Application
   alias ServicePoolLeader.SimpleService
+  alias ServicePoolLeader.Coordinator
+  alias ServicePoolLeader.TrackedService
   alias ServicePoolLeader.RegistryService
 
   def start(_type, _args) do
@@ -16,7 +18,15 @@ defmodule ServicePoolLeader.Application do
       # {ServicePoolLeader.Worker, arg},
       worker(SimpleService, []),
       
+      # Starts a coordinator service that can manage tracking the registered services.
+      worker(Coordinator, []),
+      
+      # Starts the service that uses the Coordinator and registers itself with it.
+      worker(TrackedService, []),
+
       # # If you want to try it using a Registry... (does not work in cluster across nodes, local-only)
+      # # Commented out by default as it clutters the :observer.start Application view and doesn't 
+      # # work for our goals.
       # supervisor(Registry, [:duplicate, RegistryService.registry_name]),
       # worker(RegistryService, []),
     ]

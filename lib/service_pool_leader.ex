@@ -4,6 +4,7 @@ defmodule ServicePoolLeader do
   """
 
   alias ServicePoolLeader.SimpleService
+  alias ServicePoolLeader.TrackedService
   alias ServicePoolLeader.RegistryService
 
   @doc """
@@ -20,6 +21,11 @@ defmodule ServicePoolLeader do
   def simple_work(), do: simple_work(nil)
   def simple_work(work) do
     SimpleService.request_work(work)
+  end
+  
+  def tracked_work(), do: tracked_work(nil)
+  def tracked_work(work) do
+    TrackedService.request_work(work)
   end
 
   @doc """
