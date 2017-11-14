@@ -22,6 +22,32 @@ Talk about leadership election considerations
 * removing self from the pool
 
 
+### Playing with the Demo
+
+```bash
+iex --sname a@localhost -S mix
+iex --sname b@localhost -S mix
+iex --sname c@localhost -S mix
+```
+
+In one of the IEx terminals, run `join/0` to link up the nodes as a cluster.
+
+```elixir
+ServicePoolLeader.join()
+```
+
+Perform some work using the naive approach. Try it from different nodes. Who does the work?
+
+```elixir
+ServicePoolLeader.naive()
+ServicePoolLeader.naive(10)
+ServicePoolLeader.naive(5)
+```
+
+What happens when you kill one of the services? (Can use `:observer.start` to explore and kill it.)
+
+What happens when you kill one of the nodes? (`ctrl+c, ctrl+c`)
+
 ## Background
 
 * [Registry is Local Only](https://elixirforum.com/t/why-is-registry-local-only/6781/10) - response by Jose Valim
