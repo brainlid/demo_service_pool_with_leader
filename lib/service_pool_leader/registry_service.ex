@@ -1,4 +1,4 @@
-defmodule ServicePoolLeader.SpecialService do
+defmodule ServicePoolLeader.RegistryService do
   @moduledoc """
   The service that belongs to a Registry pool and has one active leader in the
   pool. Other non-leader services in the pool sit idle but are available as a
@@ -22,11 +22,11 @@ defmodule ServicePoolLeader.SpecialService do
 
   ## Options
 
-  * name - defaults to use `:special_service`. Overridable for testing.
+  * name - defaults to use `:registry_service`. Overridable for testing.
 
   """
   def start_link(opts \\ []) when is_list(opts) do
-    name = Keyword.get(opts, :name, :special_service)
+    name = Keyword.get(opts, :name, :registry_service)
     GenServer.start_link(__MODULE__, %{}, [name: name])
   end
 

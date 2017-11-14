@@ -4,14 +4,14 @@ defmodule ServicePoolLeader do
   """
 
   alias ServicePoolLeader.SimpleService
-  alias ServicePoolLeader.SpecialService
+  alias ServicePoolLeader.RegistryService
 
   @doc """
   Request work to be performed by the leader.
   """
-  def request_work(), do: request_work(nil)
-  def request_work(work) do
-    SpecialService.request_work(work)
+  def registry_work(), do: registry_work(nil)
+  def registry_work(work) do
+    RegistryService.request_work(work)
   end
 
   @doc """

@@ -5,7 +5,7 @@ defmodule ServicePoolLeader.Application do
 
   use Application
   alias ServicePoolLeader.SimpleService
-  # alias ServicePoolLeader.SpecialService
+  alias ServicePoolLeader.RegistryService
 
   def start(_type, _args) do
     import Supervisor.Spec, warn: false
@@ -14,9 +14,11 @@ defmodule ServicePoolLeader.Application do
     children = [
       # Starts a worker by calling: ServicePoolLeader.Worker.start_link(arg)
       # {ServicePoolLeader.Worker, arg},
-      worker(SimpleService, [])
-      # supervisor(Registry, [:duplicate, SpecialService.registry_name]),
-      # worker(SpecialService, []),
+      worker(SimpleService, []),
+      
+      # # If you want to try it using a Registry... (does not work in cluster across nodes, local-only)
+      # supervisor(Registry, [:duplicate, RegistryService.registry_name]),
+      # worker(RegistryService, []),
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
