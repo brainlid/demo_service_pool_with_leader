@@ -36,12 +36,12 @@ In one of the IEx terminals, run `join/0` to link up the nodes as a cluster.
 ServicePoolLeader.join()
 ```
 
-Perform some work using the naive approach. Try it from different nodes. Who does the work?
+Perform some work using the simple/naive approach. Try it from different nodes. Who does the work?
 
 ```elixir
-ServicePoolLeader.naive()
-ServicePoolLeader.naive(10)
-ServicePoolLeader.naive(5)
+ServicePoolLeader.simple_work()
+ServicePoolLeader.simple_work(10)
+ServicePoolLeader.simple_work(5)
 ```
 
 What happens when you kill one of the services? (Can use `:observer.start` to explore and kill it.)

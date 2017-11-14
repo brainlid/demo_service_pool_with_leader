@@ -17,8 +17,8 @@ defmodule ServicePoolLeader do
   @doc """
   A simplistic and naive approach that demonstrates the basic concept working.
   """
-  def naive(), do: naive(nil)
-  def naive(work) do
+  def simple_work(), do: simple_work(nil)
+  def simple_work(work) do
     SimpleService.request_work(work)
   end
 
