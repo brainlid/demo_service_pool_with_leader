@@ -5,7 +5,7 @@ defmodule ServicePoolLeader.Coordinator do
   """
   use GenServer
   require Logger
-  
+
   @name :coordinator_service
   @pg2_group :coordinated_services
   @ets_table :coordinated_services_ets_cache
@@ -42,17 +42,17 @@ defmodule ServicePoolLeader.Coordinator do
     # get the metadata for the member services
     member_metadata = services_with_metadata(members)
     # if any members don't have metadata, coordinators need to sync up.
-    service_list = 
+    service_list =
       if Enum.any?(member_metadata, &is_nil/1) do
         Logger.info("Detected missing metadata, requesting sync")
         # blocking call, once completed, can use that set of data
         local_coordinator = Process.whereis(@name)
         send(local_coordinator, {:sync, self()})
         receive do
-          :synced -> 
+          :synced ->
             services_with_metadata(members)
         after
-          5_000 -> 
+          5_000 ->
             Logger.warn("Local coordinator :sync timed out. Using existing cache")
             member_metadata
         end
@@ -63,7 +63,7 @@ defmodule ServicePoolLeader.Coordinator do
     # select the leader from the queried (or re-queried) metadata
     select_leader(service_list)
   end
-  
+
   @doc """
   Determine the leader and send the message to it.
   """
@@ -71,7 +71,7 @@ defmodule ServicePoolLeader.Coordinator do
     # lookup the leader
     case get_leader() do
       nil -> {:error, :no_leader}
-      pid when is_pid(pid) -> 
+      pid when is_pid(pid) ->
         # send the request to the leader. returns the result
         GenServer.call(pid, request, timeout)
     end
@@ -98,10 +98,10 @@ defmodule ServicePoolLeader.Coordinator do
   # TODO: on sending the request to the leader, could check Process.is_alive?.
   #       better option is to attempt send, if it fails, send to next and update
   #       the cache (via message to local coord service to sync cache to PG2 membership)
-  
+
   # TODO: check pg2 membership and compare with known cache. If there are pg2 members that we don't have metadata for, need to sync with other coordinators first.
   #       This happens when nodes are joined to cluster after having started up. So no registration events were received except the local one only.
-  
+
   ###
   ### SERVER CALLBACKS
   ###
@@ -124,9 +124,9 @@ defmodule ServicePoolLeader.Coordinator do
   """
   def handle_call({:register, service_pid, metadata}, _from, %{registered: registered} = state) do
     # If this is the service_pid's local node, register it with the PG2 group.
-    # The same pid can be joined to the group multiple times and 
+    # The same pid can be joined to the group multiple times and
     # will have multiple listings which we don't want.
-    new_state = 
+    new_state =
       if node(service_pid) == node() do
         # join the PG2 group
         :ok = :pg2.join(@pg2_group, service_pid)
@@ -152,14 +152,14 @@ defmodule ServicePoolLeader.Coordinator do
   def handle_call(:status, _from, %{registered: registered} = state) do
     # Lookup the metadata for the registered processes and return the list
     # as [{service_pid, metadata}]
-    results = 
-      Enum.map registered, fn(service) -> 
+    results =
+      Enum.map registered, fn(service) ->
         {service, lookup_metadata(service)}
       end
     {:reply, results, state}
   end
   def handle_call(request, from, state) do
-    super(request, from, state)    
+    super(request, from, state)
   end
 
   @doc """
@@ -185,7 +185,7 @@ defmodule ServicePoolLeader.Coordinator do
       Logger.info("Notifying #{inspect sender} that sync completed")
       send(sender, :synced)
     end
-    
+
     {:noreply, state}
   end
   def handle_info(request, state) do
@@ -209,26 +209,26 @@ defmodule ServicePoolLeader.Coordinator do
     Logger.info("Cache updated and service entry removed. pid: #{inspect service_pid}")
     :ok
   end
-  
+
   # Lookup the metadata for the service fromt the ETS cache table.
   # Returns {pid, metadata}
   defp lookup_metadata(service_pid) do
     :ets.lookup(@ets_table, service_pid)
   end
-  
+
   # Given the list of services, return the metadata with it.
   defp services_with_metadata(pid_list) do
-    Enum.map pid_list, fn(pid) -> 
+    Enum.map pid_list, fn(pid) ->
       case lookup_metadata(pid) do
         [] -> nil
         [match] -> match
-        _ -> 
+        _ ->
           Logger.error("Unexpectedly received multiple ETS lookup matches for key #{inspect pid}")
           nil
       end
     end
   end
-  
+
   # Given the member-metadata results, select who the leader is.
   defp select_leader(members_metadata) when is_list(members_metadata) do
     # choosing simply by "longest lived" member. Assuming all else is equal.
