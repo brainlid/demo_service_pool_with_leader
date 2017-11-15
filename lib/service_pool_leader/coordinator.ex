@@ -43,7 +43,8 @@ defmodule ServicePoolLeader.Coordinator do
     member_metadata = services_with_metadata(members)
     # if any members don't have metadata, coordinators need to sync up.
     service_list = 
-      if Enum.any?(member_metadata, fn({_pid, metadata}) -> metadata == nil end) do
+      if Enum.any?(member_metadata, &is_nil/1) do
+        Logger.info("Detected missing metadata, requesting sync")
         # blocking call, once completed, can use that set of data
         local_coordinator = Process.whereis(@name)
         send(local_coordinator, {:sync, self()})
@@ -181,6 +182,7 @@ defmodule ServicePoolLeader.Coordinator do
     IO.inspect results, label: "Yet to process"
 
     if sender do
+      Logger.info("Notifying #{inspect sender} that sync completed")
       send(sender, :synced)
     end
     
@@ -231,6 +233,7 @@ defmodule ServicePoolLeader.Coordinator do
   defp select_leader(members_metadata) when is_list(members_metadata) do
     # choosing simply by "longest lived" member. Assuming all else is equal.
     members_metadata
+    |> Enum.reject(&is_nil/1)
     |> Enum.sort_by(fn({_pid, metadata}) -> Map.get(metadata, :started) end)
     |> List.first()
     |> case do
