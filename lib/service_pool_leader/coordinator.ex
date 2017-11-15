@@ -87,6 +87,8 @@ defmodule ServicePoolLeader.Coordinator do
   #       won't know about it's own originally setup service.
   # TODO: could have all coordinators return all their known services.
   #       then the receiver just needs to de-dup and that's the list.
+  # TODO: Other option is to do a supervisor recovery of rest... force a restart of the tracked service, it will re-register.
+  # TODO: change coordinator to take an atom for the group being requested? Could allow tracking multiple types of services (not just the one type, one pool)
 
   ###
   ### SERVER CALLBACKS
