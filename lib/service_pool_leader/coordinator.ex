@@ -42,6 +42,8 @@ defmodule ServicePoolLeader.Coordinator do
     # get the metadata for the member services
     member_metadata = services_with_metadata(members)
     # if any members don't have metadata, coordinators need to sync up.
+    # This happens when nodes are joined to cluster after having started up.
+    # So no registration events were received except the local one only.
     service_list =
       if Enum.any?(member_metadata, &is_nil/1) do
         Logger.info("Detected missing metadata, requesting sync")
@@ -77,30 +79,14 @@ defmodule ServicePoolLeader.Coordinator do
     end
   end
 
-  # TODO: periodically, use the :pg2.members to remove ETS entries for PIDs that
-  #       no longer exist.
-  # TODO: Coordinator can broadcast to other Coordinators when a new registration
-  #       takes place. Coordinator could Monitor it's local service. When local
-  #       service is replaced or goes down, can broadcast to other's to update
-  #       their membership tables.
-  # TODO: On registration, broadcast to other coordinators the metadata of the
-  #       new service.
-  # TODO: metadata update function could be created as well.
-
-  # TODO: problem is dealing with 2nd and 3rd Coordinator to start (staggered node startup)
-  #       and they don't have the previously registered nodes.
-  #       On startup, could lookup PG2 membership and if there are unknown entries,
-  #       perform a multi_call sync? Could require the service to answer a metadata query. Don't like that.
-  #       The Coordinator sync could just be on startup of the coord service that
-  #       it queries all nodes (all other nodes?) for their caches?
-  # TODO: inter-coordinator request for copy of cache values
-  # TODO: register can be multi_call to all. Monitoring cross-node DOWN, etc.
   # TODO: on sending the request to the leader, could check Process.is_alive?.
   #       better option is to attempt send, if it fails, send to next and update
   #       the cache (via message to local coord service to sync cache to PG2 membership)
 
-  # TODO: check pg2 membership and compare with known cache. If there are pg2 members that we don't have metadata for, need to sync with other coordinators first.
-  #       This happens when nodes are joined to cluster after having started up. So no registration events were received except the local one only.
+  # TODO: killing the coordinator, starts up but doesn't have a locally registered tracked service.
+  #       won't know about it's own originally setup service.
+  # TODO: could have all coordinators return all their known services.
+  #       then the receiver just needs to de-dup and that's the list.
 
   ###
   ### SERVER CALLBACKS
@@ -115,14 +101,14 @@ defmodule ServicePoolLeader.Coordinator do
     # send self a message after starting up to attempt an initial :sync with any other coordinators
     Process.send_after(self(), {:sync, nil}, 100)
     # setup the initial state
-    new_state = Map.merge(state, %{registered: []})
+    new_state = Map.merge(state, %{registered: [], refs: []})
     {:ok, new_state}
   end
 
   @doc """
   Register a service with the Coordinator.
   """
-  def handle_call({:register, service_pid, metadata}, _from, %{registered: registered} = state) do
+  def handle_call({:register, service_pid, metadata}, _from, %{registered: registered, refs: refs} = state) do
     # If this is the service_pid's local node, register it with the PG2 group.
     # The same pid can be joined to the group multiple times and
     # will have multiple listings which we don't want.
@@ -132,7 +118,9 @@ defmodule ServicePoolLeader.Coordinator do
         :ok = :pg2.join(@pg2_group, service_pid)
         Logger.info("Service #{inspect service_pid} added to group #{inspect @pg2_group}")
         # track which services are directly registered by this coordinator
-        Map.put(state, :registered, [service_pid | registered])
+        state
+        |> Map.put(:registered, [service_pid | registered])
+        |> Map.put(:refs, [Process.monitor(service_pid) | refs])
       else
         state
       end
@@ -152,10 +140,7 @@ defmodule ServicePoolLeader.Coordinator do
   def handle_call(:status, _from, %{registered: registered} = state) do
     # Lookup the metadata for the registered processes and return the list
     # as [{service_pid, metadata}]
-    results =
-      Enum.map registered, fn(service) ->
-        {service, lookup_metadata(service)}
-      end
+    results = Enum.flat_map registered, fn(service) -> lookup_metadata(service) end
     {:reply, results, state}
   end
   def handle_call(request, from, state) do
@@ -165,28 +150,43 @@ defmodule ServicePoolLeader.Coordinator do
   @doc """
   Handle other messages like DOWN notifications for monitored processes.
   """
-  def handle_info({:DOWN, _ref, :process, service_pid, _reason}, state) do
+  def handle_info({:DOWN, down_ref, :process, service_pid, _reason}, %{refs: refs} = state) do
     # remove the DOWNed pid from the cache (received message by monitoring it)
     remove_from_cache(service_pid)
-    {:noreply, state}
+    # Remove the reference for the DOWNed pid from our tracked refs
+    new_state = Map.put(state, :refs, List.delete(refs, down_ref))
+    {:noreply, new_state}
   end
 
   @doc """
   Request to sync up status with the other Coordinators in the cluster.
   """
   def handle_info({:sync, sender}, state) do
+    Logger.info("Received :sync message")
     # request status from all *other* nodes in the cluster (not asking self)
     {results, _bad_nodes} = GenServer.multi_call(Node.list(), @name, :status)
 
-    # TODO: process the results to update local ETS
-    IO.inspect results, label: "Yet to process"
+    # un-monitor existing pids
+    refs = Map.get(state, :refs)
+    Enum.each refs, fn(ref) -> Process.demonitor(ref) end
+    # monitor the pids in the pg2 group
+    members = :pg2.get_members(@pg2_group)
+    new_refs = Enum.map members, fn(member) -> Process.monitor(member) end
+    new_state = Map.put(state, :refs, new_refs)
+    Logger.info("Refreshed monitoring references")
 
+    # process the results to update local ETS
+    Enum.each(results, fn({_node, entries}) ->
+      Enum.each(entries, fn({service_pid, metadata}) ->
+        add_to_cache(service_pid, metadata)
+      end)
+    end)
+    # if a sender pid was given, notify that sync has completed
     if sender do
       Logger.info("Notifying #{inspect sender} that sync completed")
       send(sender, :synced)
     end
-
-    {:noreply, state}
+    {:noreply, new_state}
   end
   def handle_info(request, state) do
     super(request, state)
@@ -211,7 +211,7 @@ defmodule ServicePoolLeader.Coordinator do
   end
 
   # Lookup the metadata for the service fromt the ETS cache table.
-  # Returns {pid, metadata}
+  # Returns {pid, metadata} (ie. {key, value})
   defp lookup_metadata(service_pid) do
     :ets.lookup(@ets_table, service_pid)
   end
