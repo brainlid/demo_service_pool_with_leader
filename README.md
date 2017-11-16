@@ -92,3 +92,7 @@ elected.
 * Provide a function or MFA to call when new leader should be appointed
 because the current leader left or went down. Externally define the function
 that selects the leader.
+* Add a new Supervisor to manage the Coordinator and TrackedService so the
+`:rest_for_one` strategy is more controlled.
+* TrackedService have unique behavior based on being a the leader. Could ask
+Coordinator if it is the leader.
