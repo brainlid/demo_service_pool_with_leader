@@ -1,6 +1,6 @@
 defmodule ServicePoolLeader.TrackedService do
   @moduledoc """
-  A service that uses a Coordinator to track and coordinate leadership 
+  A service that uses a Coordinator to track and coordinate leadership
   across nodes.
   """
   use GenServer
@@ -19,7 +19,7 @@ defmodule ServicePoolLeader.TrackedService do
   end
 
   @doc """
-  Client interface that requests work to be done. Defers leader tracking to the 
+  Client interface that requests work to be done. Defers leader tracking to the
   Coordinator.
   """
   def request_work(payload) do
