@@ -76,6 +76,17 @@ There are a number of Leader Election strategies and options you might consider.
 This demo project uses the "longest running" service as to how a leader is
 elected.
 
+## Features Used for Discussion/Experimentation
+
+* Clustering
+* `:observer.start` for killing and viewing ETS tables
+* Process monitoring
+* `:pg2`
+* `:ets` tables
+* `GenServer.multi_call()`
+* Supervisor `:rest_for_one` strategy
+* `Registry` example is built-in too
+
 ## Ideas for future experiments
 
 * Provide a function or MFA to call when new leader should be appointed
