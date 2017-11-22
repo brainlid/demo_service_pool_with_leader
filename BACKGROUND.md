@@ -39,3 +39,8 @@ Mnesia supports cross-node syncing of ram-tables (since it really is transient
 data only). However, writing it into a library to make it easier to use would
 make it harder to use an existing Mnesia DB or for your application to use
 Mnesia for some other purpose.
+
+
+## Leader Election Strategies
+
+* https://docs.microsoft.com/en-us/azure/architecture/patterns/leader-election
